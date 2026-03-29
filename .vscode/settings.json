@@ -1,4 +1,13 @@
 {
-    "window.autoDetectColorScheme": true,
-    "git.autofetch": true
+  "window.autoDetectColorScheme": true,
+  "workbench.iconTheme": "vscode-icons",
+  "git.autofetch": true,
+  "python.analysis.typeCheckingMode": "basic",
+  "editor.formatOnSave": true,
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.autopep8",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+    },
+  }
 }

@@ -7,6 +7,16 @@
 	"features": {
 		"ghcr.io/devcontainers/features/python:1": {},
 		"ghcr.io/devcontainers-extra/features/uv:1": {}
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.autopep8",
+				"ms-python.isort",
+				"vscode-icons-team.vscode-icons"
+			]
+		}
 	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
