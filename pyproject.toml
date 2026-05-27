@@ -1,0 +1,24 @@
+[project]
+name = "the-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+    "fastapi>=0.136.1",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.14.1",
+    "pydantic[email]>=2.13.4",
+    "sqlalchemy>=2.0.49",
+    "telethon>=1.43.2",
+    "uvicorn[standard]>=0.47.0",
+]
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.3.0",
+]
