@@ -8,8 +8,8 @@ complex scheduling via iCalendar RRULE strings.
 import enum
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
 
@@ -50,6 +50,16 @@ class Task(Base):
     )
     project_tag: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Optional link to the RecurringRule that spawned this task
+    rule_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("recurring_rules.id"), nullable=True
+    )
+
+    # Relationships
+    rule: Mapped["RecurringRule | None"] = relationship(
+        back_populates="tasks", lazy="selectin"
+    )
+
     def __repr__(self) -> str:
         return f"<Task(id={self.id}, title='{self.title}', status={self.status.value})>"
 
@@ -74,8 +84,14 @@ class RecurringRule(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    # Relationships
+    tasks: Mapped[list["Task"]] = relationship(
+        back_populates="rule", lazy="selectin"
+    )
+
     def __repr__(self) -> str:
         return (
             f"<RecurringRule(id={self.id}, title='{self.task_title}', "
             f"strict={self.is_strict})>"
         )
+
