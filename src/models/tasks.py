@@ -55,6 +55,11 @@ class Task(Base):
         Integer, ForeignKey("recurring_rules.id"), nullable=True
     )
 
+    # Optional link to a knowledge-base Note
+    note_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("notes.id"), nullable=True
+    )
+
     # Relationships
     rule: Mapped["RecurringRule | None"] = relationship(
         back_populates="tasks", lazy="selectin"
