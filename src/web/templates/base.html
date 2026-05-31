@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Personal OS — Your modular life dashboard" />
+  <title>{% block title %}Personal OS{% endblock %}</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            surface: {
+              50:  '#f8fafc',
+              100: '#f1f5f9',
+              200: '#e2e8f0',
+              700: '#1e293b',
+              800: '#0f172a',
+              900: '#020617',
+            },
+            accent: {
+              400: '#a78bfa',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Scrollbar styling ─────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+    /* ── Sidebar link hover animation ──────────────────────────────── */
+    .nav-link {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-link:hover {
+      background: linear-gradient(135deg, rgba(139,92,246,0.12), rgba(167,139,250,0.08));
+      transform: translateX(4px);
+    }
+    .nav-link.active {
+      background: linear-gradient(135deg, rgba(139,92,246,0.2), rgba(167,139,250,0.12));
+      border-left: 3px solid #8b5cf6;
+    }
+
+    /* ── Subtle fade-in for page content ───────────────────────────── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in { animation: fadeInUp 0.4s ease-out; }
+
+    /* ── HTMX transition ───────────────────────────────────────────── */
+    .htmx-swapping { opacity: 0; transition: opacity 0.15s ease-out; }
+  </style>
+
+  {% block head %}{% endblock %}
+</head>
+
+<body class="h-full bg-surface-900 text-slate-200 font-sans antialiased">
+  <div class="flex h-full">
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         SIDEBAR
+         ═══════════════════════════════════════════════════════════════ -->
+    <aside class="w-64 flex-shrink-0 bg-surface-800 border-r border-slate-700/50 flex flex-col">
+
+      <!-- Logo / Brand -->
+      <div class="px-6 py-5 border-b border-slate-700/50">
+        <a href="/web/dashboard" class="flex items-center gap-3 group">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-accent-500 to-purple-400 flex items-center justify-center shadow-lg shadow-accent-500/20 group-hover:shadow-accent-500/40 transition-shadow">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-base font-semibold tracking-tight text-white">Personal OS</h1>
+            <p class="text-[11px] text-slate-400 font-medium tracking-wide uppercase">v0.1.0</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Navigation -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <p class="px-3 mb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Core</p>
+
+        <a href="/web/dashboard" id="nav-dashboard" class="nav-link {% block nav_dashboard %}{% endblock %} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white">
+          <svg class="w-[18px] h-[18px] text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+          </svg>
+          Dashboard
+        </a>
+
+        <a href="/web/bookmarks" id="nav-bookmarks" class="nav-link {% block nav_bookmarks %}{% endblock %} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white">
+          <svg class="w-[18px] h-[18px] text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+          </svg>
+          Bookmarks
+        </a>
+
+        <a href="/web/notes" id="nav-pkb" class="nav-link {% block nav_pkb %}{% endblock %} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white">
+          <svg class="w-[18px] h-[18px] text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+          </svg>
+          Knowledge Base
+        </a>
+
+        <a href="/web/expenses" id="nav-expenses" class="nav-link {% block nav_expenses %}{% endblock %} flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:text-white">
+          <svg class="w-[18px] h-[18px] text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+          Expenses
+        </a>
+      </nav>
+
+      <!-- Footer -->
+      <div class="px-4 py-3 border-t border-slate-700/50">
+        <div class="flex items-center gap-2 text-[11px] text-slate-500">
+          <div class="w-2 h-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50"></div>
+          System Healthy
+        </div>
+      </div>
+    </aside>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MAIN CONTENT
+         ═══════════════════════════════════════════════════════════════ -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="animate-fade-in">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+  </div>
+</body>
+</html>
