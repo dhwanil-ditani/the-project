@@ -6,10 +6,12 @@ Uses Tailwind CSS + HTMX on the frontend.
 """
 
 import json
+import re
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
+import markdown
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
@@ -20,9 +22,11 @@ from sqlalchemy.orm import Session
 from src.database import get_db
 from src.models.bookmarks import Bookmark
 from src.models.expenses import Account, AccountType, Transaction
+from src.models.notes import Note
 from src.models.tasks import Task, TaskPriority, TaskStatus
 from src.schemas.tasks import ActionItem
 from src.services.ledger import process_transaction
+from src.services.notes_engine import process_wiki_links
 from src.services.scraper import scrape_url_metadata
 from src.services.task_engine import evaluate_pending_tasks
 
@@ -391,3 +395,148 @@ async def create_transaction_hx(
         context={"txn": txn},
     )
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Knowledge Base (Notes)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _render_markdown(content: str) -> str:
+    """
+    Convert note content to HTML.
+
+    Transforms ``[[Title]]`` wiki-links into clickable HTMX links
+    before passing through the Markdown processor.
+    """
+    # Replace [[Title]] with clickable links
+    def wiki_to_link(match: re.Match) -> str:
+        title = match.group(1).strip()
+        return (
+            f'<a href="#" class="text-accent-400 hover:underline" '
+            f'hx-get="/web/notes/by-title/{title}" '
+            f'hx-target="#editor-panel" hx-swap="innerHTML">'
+            f'🔗 {title}</a>'
+        )
+
+    processed = re.sub(r"\[\[([^\[\]]+)\]\]", wiki_to_link, content)
+    return markdown.markdown(processed, extensions=["fenced_code", "tables"])
+
+
+@router.get("/notes", response_class=HTMLResponse)
+async def notes_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Render the Knowledge Base workspace."""
+    stmt = select(Note).order_by(Note.updated_at.desc())
+    notes = list(db.execute(stmt).scalars().all())
+
+    return templates.TemplateResponse(
+        request,
+        name="notes.html",
+        context={"notes": notes},
+    )
+
+@router.get("/notes/by-title/{title}", response_class=HTMLResponse)
+async def get_note_by_title(
+    request: Request,
+    title: str,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint — load a note by title (used by wiki-link clicks)."""
+    stmt = select(Note).where(Note.title == title)
+    note = db.execute(stmt).scalar_one_or_none()
+    if note is None:
+        return HTMLResponse(
+            f'<p class="text-sm text-slate-400 py-4">Note "{title}" not found.</p>',
+            status_code=404,
+        )
+
+    rendered_html = _render_markdown(note.content) if note.content else ""
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/note_editor.html",
+        context={"note": note, "rendered_html": rendered_html},
+    )
+
+
+@router.get("/notes/{note_id}", response_class=HTMLResponse)
+async def get_note_editor(
+    request: Request,
+    note_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint — load a note into the editor panel with Markdown preview."""
+    note = db.get(Note, note_id)
+    if note is None:
+        return HTMLResponse(
+            '<p class="text-sm text-rose-400 py-4">Note not found.</p>',
+            status_code=404,
+        )
+
+    rendered_html = _render_markdown(note.content) if note.content else ""
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/note_editor.html",
+        context={"note": note, "rendered_html": rendered_html},
+    )
+
+
+@router.post("/notes/hx/create", response_class=HTMLResponse)
+async def create_note_hx(
+    request: Request,
+    title: str = Form(...),
+    content: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint — create a note and return the sidebar list item
+    partial for injection. Also processes wiki-links.
+    """
+    note = Note(title=title, content=content)
+    db.add(note)
+    db.flush()
+
+    process_wiki_links(db, note)
+
+    db.commit()
+    db.refresh(note)
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/note_item.html",
+        context={"note": note},
+    )
+
+
+@router.post("/notes/hx/save", response_class=HTMLResponse)
+async def save_note_hx(
+    note_id: int = Form(...),
+    title: str = Form(...),
+    content: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint — update a note's title and content,
+    re-process wiki-links, and return a success feedback fragment.
+    """
+    note = db.get(Note, note_id)
+    if note is None:
+        return HTMLResponse(
+            '<span class="text-rose-400">Note not found</span>',
+            status_code=404,
+        )
+
+    note.title = title
+    note.content = content
+    db.flush()
+
+    process_wiki_links(db, note)
+
+    db.commit()
+
+    return HTMLResponse(
+        '<span class="text-emerald-400 font-medium">'
+        '✓ Saved</span>'
+    )

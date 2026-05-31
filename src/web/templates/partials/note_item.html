@@ -1,0 +1,14 @@
+<!-- Partial: Note card in sidebar list -->
+<a href="#"
+   id="note-item-{{ note.id }}"
+   hx-get="/web/notes/{{ note.id }}"
+   hx-target="#editor-panel"
+   hx-swap="innerHTML"
+   class="block px-4 py-3 border-b border-slate-700/30 hover:bg-surface-700/40 transition-all duration-150 cursor-pointer group">
+  <p class="text-sm font-medium text-white truncate group-hover:text-accent-400 transition-colors">
+    {{ note.title }}
+  </p>
+  <p class="text-[10px] text-slate-500 mt-0.5">
+    {{ note.updated_at.strftime('%b %d, %Y %H:%M') if note.updated_at else '' }}
+  </p>
+</a>

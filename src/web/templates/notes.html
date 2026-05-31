@@ -1,0 +1,295 @@
+{% extends "base.html" %}
+
+{% block title %}Knowledge Base — Personal OS{% endblock %}
+{% block nav_pkb %}active{% endblock %}
+
+{% block head %}
+<!-- D3.js -->
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<!-- Tailwind Typography for Markdown rendering -->
+<style>
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: inline-flex; }
+
+  /* D3 graph styling */
+  #knowledge-graph { cursor: grab; }
+  #knowledge-graph:active { cursor: grabbing; }
+  .graph-node { cursor: pointer; transition: filter 0.15s; }
+  .graph-node:hover { filter: brightness(1.3) drop-shadow(0 0 8px rgba(139,92,246,0.5)); }
+  .graph-link { stroke: rgba(148, 163, 184, 0.2); stroke-width: 1.5; }
+  .graph-label { font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 500; fill: #e2e8f0; pointer-events: none; text-anchor: middle; }
+  .graph-arrow { fill: rgba(148, 163, 184, 0.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="px-8 py-6 max-w-7xl mx-auto">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">Knowledge Base</h1>
+      <p class="mt-1 text-sm text-slate-400">
+        {{ notes | length }} note{{ 's' if notes | length != 1 else '' }} · Wiki-linked knowledge graph
+      </p>
+    </div>
+  </div>
+
+  <!-- ── Knowledge Graph Canvas ─────────────────────────────────────── -->
+  <div class="bg-surface-800 border border-slate-700/50 rounded-xl overflow-hidden mb-6">
+    <div class="px-5 py-3 border-b border-slate-700/30 flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">Knowledge Graph</h2>
+      <button onclick="refreshGraph()" class="text-xs text-accent-400 hover:text-accent-300 font-medium transition-colors flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+        </svg>
+        Refresh
+      </button>
+    </div>
+    <svg id="knowledge-graph" class="w-full bg-surface-900/60" style="height: 420px;"></svg>
+  </div>
+
+  <!-- ── Workspace: Notes List + Editor ─────────────────────────────── -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- ── Left Panel: Notes Manager ──────────────────────────────── -->
+    <div class="lg:col-span-1">
+      <!-- New Note Form -->
+      <div class="bg-surface-800 border border-slate-700/50 rounded-xl overflow-hidden mb-4">
+        <div class="px-5 py-3 border-b border-slate-700/30">
+          <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">New Note</h2>
+        </div>
+        <form
+          hx-post="/web/notes/hx/create"
+          hx-target="#notes-list"
+          hx-swap="afterbegin"
+          hx-on::after-request="if(event.detail.successful) { this.reset(); refreshGraph(); }"
+          class="p-4 space-y-3"
+        >
+          <input type="text" name="title" placeholder="Note title" required
+                 class="w-full px-3 py-2 bg-surface-900 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all" />
+          <textarea name="content" rows="3" placeholder="Content (supports [[wiki-links]])"
+                    class="w-full px-3 py-2 bg-surface-900 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all font-mono text-xs leading-relaxed resize-y"></textarea>
+          <button type="submit"
+                  class="w-full py-2 bg-accent-600 hover:bg-accent-500 text-white text-sm font-medium rounded-lg transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-accent-600/20">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Create Note
+          </button>
+        </form>
+      </div>
+
+      <!-- Notes List -->
+      <div class="bg-surface-800 border border-slate-700/50 rounded-xl overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-700/30">
+          <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wider">All Notes</h2>
+        </div>
+        <div id="notes-list" class="max-h-[400px] overflow-y-auto">
+          {% if notes %}
+            {% for note in notes %}
+              {% include "partials/note_item.html" %}
+            {% endfor %}
+          {% else %}
+            <div class="px-4 py-8 text-center">
+              <p class="text-sm text-slate-500">No notes yet. Create one above.</p>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Right Panel: Editor + Preview ──────────────────────────── -->
+    <div class="lg:col-span-2">
+      <div class="bg-surface-800 border border-slate-700/50 rounded-xl p-5" id="editor-panel">
+        <!-- Default empty state -->
+        <div class="flex flex-col items-center justify-center py-16 text-center">
+          <div class="w-14 h-14 rounded-2xl bg-surface-900 border border-slate-700/50 flex items-center justify-center mb-4">
+            <svg class="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+          </div>
+          <h3 class="text-lg font-semibold text-slate-300">Select a note</h3>
+          <p class="mt-1 text-sm text-slate-500">Click on a note from the list or a graph node to start editing.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     D3.js Force-Directed Knowledge Graph
+     ═══════════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  'use strict';
+
+  const svg = d3.select('#knowledge-graph');
+  const container = svg.node().parentElement;
+  let simulation, linkGroup, nodeGroup, labelGroup;
+
+  // Color palette for nodes
+  const nodeColors = [
+    '#8b5cf6', '#a78bfa', '#7c3aed', '#6d28d9',
+    '#818cf8', '#a5b4fc', '#c084fc', '#e879f9',
+  ];
+
+  function getNodeColor(i) {
+    return nodeColors[i % nodeColors.length];
+  }
+
+  function initGraph() {
+    const width  = container.clientWidth;
+    const height = parseInt(svg.style('height'));
+
+    svg.selectAll('*').remove();
+
+    // Arrow marker for directed edges
+    svg.append('defs').append('marker')
+      .attr('id', 'arrowhead')
+      .attr('viewBox', '0 -5 10 10')
+      .attr('refX', 22)
+      .attr('refY', 0)
+      .attr('markerWidth', 6)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,-4L10,0L0,4')
+      .attr('class', 'graph-arrow');
+
+    // Main groups (order matters for layering)
+    linkGroup  = svg.append('g').attr('class', 'links');
+    nodeGroup  = svg.append('g').attr('class', 'nodes');
+    labelGroup = svg.append('g').attr('class', 'labels');
+
+    // Enable zoom and pan
+    const zoom = d3.zoom()
+      .scaleExtent([0.3, 4])
+      .on('zoom', (event) => {
+        linkGroup.attr('transform', event.transform);
+        nodeGroup.attr('transform', event.transform);
+        labelGroup.attr('transform', event.transform);
+      });
+    svg.call(zoom);
+
+    simulation = d3.forceSimulation()
+      .force('charge', d3.forceManyBody().strength(-200).distanceMax(300))
+      .force('center', d3.forceCenter(width / 2, height / 2))
+      .force('collision', d3.forceCollide().radius(30))
+      .force('x', d3.forceX(width / 2).strength(0.05))
+      .force('y', d3.forceY(height / 2).strength(0.05));
+
+    return { width, height };
+  }
+
+  function renderGraph(data) {
+    const { width, height } = initGraph();
+
+    const nodes = data.nodes.map(n => ({ ...n }));
+    const edges = data.edges.map(e => ({
+      source: e.from_id,
+      target: e.to_id,
+    }));
+
+    if (nodes.length === 0) {
+      svg.append('text')
+        .attr('x', width / 2).attr('y', height / 2)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#64748b')
+        .attr('font-family', 'Inter, sans-serif')
+        .attr('font-size', '13px')
+        .text('No notes yet. Create a note with [[wiki-links]] to see the graph.');
+      return;
+    }
+
+    // Links
+    simulation.force('link', d3.forceLink(edges)
+      .id(d => d.id)
+      .distance(120)
+      .strength(0.4));
+
+    const links = linkGroup.selectAll('line')
+      .data(edges)
+      .join('line')
+      .attr('class', 'graph-link')
+      .attr('marker-end', 'url(#arrowhead)');
+
+    // Nodes
+    const nodeCircles = nodeGroup.selectAll('circle')
+      .data(nodes)
+      .join('circle')
+      .attr('r', 14)
+      .attr('fill', (d, i) => getNodeColor(i))
+      .attr('stroke', (d, i) => d3.color(getNodeColor(i)).brighter(0.5))
+      .attr('stroke-width', 2)
+      .attr('class', 'graph-node')
+      .on('click', (event, d) => {
+        // Load note into editor via HTMX
+        htmx.ajax('GET', `/web/notes/${d.id}`, { target: '#editor-panel', swap: 'innerHTML' });
+      })
+      .call(d3.drag()
+        .on('start', dragStarted)
+        .on('drag', dragged)
+        .on('end', dragEnded));
+
+    // Node glow effect
+    nodeCircles.append('title').text(d => d.label);
+
+    // Labels
+    const labels = labelGroup.selectAll('text')
+      .data(nodes)
+      .join('text')
+      .attr('class', 'graph-label')
+      .attr('dy', 28)
+      .text(d => d.label.length > 16 ? d.label.slice(0, 14) + '…' : d.label);
+
+    // Simulation tick
+    simulation.nodes(nodes).on('tick', () => {
+      links
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y);
+
+      nodeCircles
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y);
+
+      labels
+        .attr('x', d => d.x)
+        .attr('y', d => d.y);
+    });
+
+    simulation.alpha(1).restart();
+  }
+
+  // Drag behaviors
+  function dragStarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+  function dragEnded(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+
+  // Fetch and render
+  window.refreshGraph = function() {
+    fetch('/api/v1/notes/graph')
+      .then(r => r.json())
+      .then(data => renderGraph(data))
+      .catch(err => console.error('Graph fetch error:', err));
+  };
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', refreshGraph);
+})();
+</script>
+{% endblock %}

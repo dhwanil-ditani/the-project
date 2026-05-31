@@ -1,0 +1,72 @@
+<!-- Partial: Note editor form + rendered preview (loaded via HTMX into #editor-panel) -->
+<div class="space-y-4">
+  <!-- Title display -->
+  <div class="flex items-center justify-between">
+    <h2 class="text-lg font-semibold text-white">{{ note.title }}</h2>
+    <span class="text-[10px] text-slate-500 font-mono">ID: {{ note.id }}</span>
+  </div>
+
+  <!-- Save form -->
+  <form
+    hx-post="/web/notes/hx/save"
+    hx-target="#save-feedback"
+    hx-swap="innerHTML"
+    hx-indicator="#save-spinner"
+    class="space-y-3"
+  >
+    <input type="hidden" name="note_id" value="{{ note.id }}" />
+
+    <!-- Title input -->
+    <div>
+      <label class="block text-xs font-medium text-slate-400 mb-1">Title</label>
+      <input type="text" name="title" value="{{ note.title }}"
+             class="w-full px-3 py-2 bg-surface-900 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all" />
+    </div>
+
+    <!-- Content textarea -->
+    <div>
+      <label class="block text-xs font-medium text-slate-400 mb-1">Content <span class="text-slate-600">(supports [[wiki-links]])</span></label>
+      <textarea name="content" rows="8"
+                placeholder="Write your note here… use [[Title]] to link to other notes"
+                class="w-full px-3 py-2 bg-surface-900 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-600 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all font-mono leading-relaxed resize-y">{{ note.content }}</textarea>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+      <button type="submit"
+              class="px-4 py-2 bg-accent-600 hover:bg-accent-500 text-white text-sm font-medium rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg shadow-accent-600/20 hover:shadow-accent-500/30">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>
+        Save Note
+      </button>
+
+      <div id="save-spinner" class="htmx-indicator">
+        <svg class="w-4 h-4 text-accent-400 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </div>
+
+      <div id="save-feedback" class="text-xs"></div>
+    </div>
+  </form>
+
+  <!-- Rendered Markdown preview -->
+  {% if rendered_html %}
+  <div class="mt-4 pt-4 border-t border-slate-700/30">
+    <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-3">Preview</p>
+    <div class="prose prose-invert prose-sm max-w-none
+                prose-headings:text-white prose-headings:font-semibold
+                prose-p:text-slate-300 prose-p:leading-relaxed
+                prose-a:text-accent-400 prose-a:no-underline hover:prose-a:underline
+                prose-strong:text-white
+                prose-code:text-emerald-400 prose-code:bg-surface-900 prose-code:px-1 prose-code:py-0.5 prose-code:rounded
+                prose-pre:bg-surface-900 prose-pre:border prose-pre:border-slate-700/50 prose-pre:rounded-lg
+                prose-ul:text-slate-300 prose-ol:text-slate-300
+                prose-blockquote:border-accent-500/50 prose-blockquote:text-slate-400">
+      {{ rendered_html | safe }}
+    </div>
+  </div>
+  {% endif %}
+</div>
