@@ -9,9 +9,7 @@ import json
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from urllib.parse import unquote
 
-import markdown
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
@@ -22,11 +20,9 @@ from sqlalchemy.orm import Session
 from src.database import get_db
 from src.models.bookmarks import Bookmark
 from src.models.expenses import Account, AccountType, Transaction
-from src.models.notes import Note
 from src.models.tasks import Task, TaskPriority, TaskStatus
 from src.schemas.tasks import ActionItem
 from src.services.ledger import process_transaction
-from src.services.notes_engine import process_wiki_links
 from src.services.scraper import scrape_url_metadata
 from src.services.task_engine import evaluate_pending_tasks
 
@@ -393,138 +389,5 @@ async def create_transaction_hx(
         request,
         name="partials/transaction_row.html",
         context={"txn": txn},
-    )
-
-    # Return empty string — HTMX outerHTML swap removes the card
-    return HTMLResponse("")
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  Personal Knowledge Base (PKB)
-# ═══════════════════════════════════════════════════════════════════════════
-
-@router.get("/notes", response_class=HTMLResponse)
-async def notes_index(
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """
-    Render the Knowledge Base workspace with an empty editor.
-    """
-    notes = list(db.execute(select(Note).order_by(Note.title)).scalars().all())
-    
-    return templates.TemplateResponse(
-        request,
-        name="notes.html",
-        context={
-            "notes": notes,
-            "current_note": None,
-            "parsed_html": "",
-        },
-    )
-
-
-@router.get("/notes/{title}", response_class=HTMLResponse)
-async def notes_page(
-    title: str,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """
-    Render the Knowledge Base workspace (or partial) for a specific note.
-    """
-    notes = list(db.execute(select(Note).order_by(Note.title)).scalars().all())
-    
-    title_unquoted = unquote(title)
-    current_note = db.execute(select(Note).where(Note.title == title_unquoted)).scalar_one_or_none()
-    
-    parsed_html = ""
-    if current_note:
-        # Basic markdown rendering
-        parsed_html = markdown.markdown(current_note.content)
-        
-    # If HTMX request, return only the editor partial
-    if request.headers.get("hx-request") == "true":
-        return templates.TemplateResponse(
-            request,
-            name="partials/note_editor.html",
-            context={
-                "notes": notes,
-                "current_note": current_note,
-                "parsed_html": parsed_html,
-            },
-        )
-        
-    return templates.TemplateResponse(
-        request,
-        name="notes.html",
-        context={
-            "notes": notes,
-            "current_note": current_note,
-            "parsed_html": parsed_html,
-        },
-    )
-
-
-@router.post("/notes/hx/save", response_class=HTMLResponse)
-async def save_note_hx(
-    request: Request,
-    title: str = Form(...),
-    content: str = Form(""),
-    original_title: str = Form(""),
-    db: Session = Depends(get_db),
-):
-    """
-    HTMX endpoint — Create or update a note and process wiki-links.
-    Returns the updated editor partial.
-    """
-    title = title.strip()
-    if not title:
-        return HTMLResponse(
-            '<div class="text-rose-400 text-sm mb-4">Error: Title is required.</div>', 
-            status_code=400
-        )
-        
-    note = None
-    if original_title:
-        # Updating an existing note
-        note = db.execute(select(Note).where(Note.title == original_title)).scalar_one_or_none()
-        if note:
-            note.title = title
-            note.content = content
-    
-    if not note:
-        # Check if new title exists, if so update it, otherwise create new
-        note = db.execute(select(Note).where(Note.title == title)).scalar_one_or_none()
-        if note:
-            note.content = content
-        else:
-            note = Note(title=title, content=content)
-            db.add(note)
-            
-    db.flush()
-    # Process [[wiki-links]] to maintain graph edges
-    process_wiki_links(db, note)
-    db.commit()
-    db.refresh(note)
-    
-    # Render updated partial
-    notes = list(db.execute(select(Note).order_by(Note.title)).scalars().all())
-    parsed_html = markdown.markdown(note.content)
-    
-    headers = {}
-    if original_title != title:
-        # Instruct HTMX to push the new URL to the browser history
-        headers["HX-Push-Url"] = f"/web/notes/{title}"
-        
-    return templates.TemplateResponse(
-        request,
-        name="partials/note_editor.html",
-        context={
-            "notes": notes,
-            "current_note": note,
-            "parsed_html": parsed_html,
-        },
-        headers=headers
     )
 
