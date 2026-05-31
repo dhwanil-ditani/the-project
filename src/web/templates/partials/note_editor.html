@@ -1,0 +1,63 @@
+<!-- Note Selector / List -->
+<div class="mb-4 flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
+  {% for note in notes %}
+    <a href="/web/notes/{{ note.title | urlencode }}" 
+       hx-get="/web/notes/{{ note.title | urlencode }}" 
+       hx-target="#note-workspace"
+       hx-push-url="true"
+       class="px-3 py-1 rounded-full text-xs font-medium {{ 'bg-accent-600 text-white' if current_note and current_note.title == note.title else 'bg-surface-700 text-slate-300 hover:bg-surface-600' }} transition-colors">
+      {{ note.title }}
+    </a>
+  {% endfor %}
+</div>
+
+<!-- Editor Form -->
+<form hx-post="/web/notes/hx/save" hx-target="#note-workspace" hx-swap="innerHTML">
+    <input type="hidden" name="original_title" value="{{ current_note.title if current_note else '' }}">
+    
+    <div>
+      <input type="text" name="title" value="{{ current_note.title if current_note else '' }}" 
+             placeholder="Note Title..." 
+             class="w-full mb-3 px-4 py-3 bg-surface-900 border border-slate-700/50 rounded-xl text-white font-bold text-lg focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all" required>
+    </div>
+    
+    <div>
+      <textarea name="content" rows="10" 
+                placeholder="Write in Markdown... (Use [[wiki-links]] to connect notes)" 
+                class="w-full mb-3 px-4 py-3 bg-surface-900 border border-slate-700/50 rounded-xl text-slate-300 font-mono text-sm focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all leading-relaxed">{{ current_note.content if current_note else '' }}</textarea>
+    </div>
+    
+    <div class="flex justify-end gap-3">
+       <a href="/web/notes" 
+          hx-get="/web/notes" 
+          hx-target="#note-workspace" 
+          hx-push-url="true" 
+          class="px-5 py-2.5 bg-surface-700 text-slate-300 font-medium rounded-xl text-sm hover:bg-surface-600 transition-colors">
+          New Note
+       </a>
+       <button type="submit" 
+               class="px-5 py-2.5 bg-accent-600 hover:bg-accent-500 text-white font-medium rounded-xl text-sm transition-all duration-200 flex items-center gap-2 shadow-lg shadow-accent-600/20 hover:shadow-accent-500/30">
+           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+           </svg>
+           Save Note
+       </button>
+    </div>
+</form>
+
+<!-- Rendered Markdown -->
+{% if parsed_html %}
+<div class="mt-8 pt-8 border-t border-slate-700/50">
+    <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Preview</h3>
+    <div class="prose prose-invert prose-slate prose-sm max-w-none prose-a:text-accent-400 hover:prose-a:text-accent-300 prose-headings:text-white prose-strong:text-white">
+        {{ parsed_html | safe }}
+    </div>
+</div>
+{% endif %}
+
+<script>
+    // Trigger graph refresh
+    if (typeof loadGraph === "function") {
+        loadGraph();
+    }
+</script>
