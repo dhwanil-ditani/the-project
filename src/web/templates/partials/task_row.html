@@ -1,0 +1,32 @@
+<tr class="border-b border-slate-700/30 hover:bg-surface-700/30 transition-colors" id="task-row-{{ task.id }}">
+  <td class="px-4 py-3 whitespace-nowrap text-sm text-white font-medium">{{ task.title }}</td>
+  <td class="px-4 py-3 whitespace-nowrap">
+    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+      {% if task.priority.value == 'High' %}bg-rose-500/20 text-rose-400
+      {% elif task.priority.value == 'Medium' %}bg-amber-500/20 text-amber-400
+      {% else %}bg-slate-500/20 text-slate-400{% endif %}">
+      {{ task.priority.value }}
+    </span>
+  </td>
+  <td class="px-4 py-3 whitespace-nowrap">
+    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+      {% if task.status.value == 'Pending' %}bg-blue-500/20 text-blue-400
+      {% elif task.status.value == 'Completed' %}bg-emerald-500/20 text-emerald-400
+      {% elif task.status.value == 'Missed' %}bg-rose-500/20 text-rose-400
+      {% else %}bg-slate-500/20 text-slate-400{% endif %}">
+      {{ task.status.value }}
+    </span>
+  </td>
+  <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
+    {{ task.due_date.strftime('%b %d, %Y') if task.due_date else 'No date' }}
+  </td>
+  <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+    <button hx-delete="/web/tasks/hx/{{ task.id }}"
+            hx-target="#task-row-{{ task.id }}"
+            hx-swap="outerHTML"
+            hx-confirm="Are you sure you want to delete this task?"
+            class="text-rose-400 hover:text-rose-300 transition-colors">
+      Delete
+    </button>
+  </td>
+</tr>

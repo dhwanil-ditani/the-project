@@ -1,0 +1,23 @@
+<tr class="border-b border-slate-700/30 hover:bg-surface-700/30 transition-colors" id="rule-row-{{ rule.id }}">
+  <td class="px-4 py-3 whitespace-nowrap text-sm text-white font-medium">{{ rule.task_title }}</td>
+  <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-400 font-mono">{{ rule.rrule_string }}</td>
+  <td class="px-4 py-3 whitespace-nowrap">
+    {% if rule.is_strict %}
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-500/20 text-slate-300">Strict Task</span>
+    {% else %}
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-accent-500/20 text-accent-400">Habit</span>
+    {% endif %}
+  </td>
+  <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
+    {{ rule.next_due.strftime('%b %d, %Y %H:%M') if rule.next_due else 'N/A' }}
+  </td>
+  <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+    <button hx-delete="/web/tasks/hx/recurring/{{ rule.id }}"
+            hx-target="#rule-row-{{ rule.id }}"
+            hx-swap="outerHTML"
+            hx-confirm="Are you sure you want to delete this recurring rule?"
+            class="text-rose-400 hover:text-rose-300 transition-colors">
+      Delete
+    </button>
+  </td>
+</tr>

@@ -23,12 +23,16 @@ from src.database import get_db
 from src.models.bookmarks import Bookmark
 from src.models.expenses import Account, AccountType, Transaction
 from src.models.notes import Note
-from src.models.tasks import Task, TaskPriority, TaskStatus
+from src.models.tasks import RecurringRule, Task, TaskPriority, TaskStatus
 from src.schemas.tasks import ActionItem
 from src.services.ledger import process_transaction
 from src.services.notes_engine import process_wiki_links
 from src.services.scraper import scrape_url_metadata
-from src.services.task_engine import evaluate_pending_tasks
+from src.services.task_engine import (
+    _compute_next_due,
+    _spawn_next_task,
+    evaluate_pending_tasks,
+)
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -163,6 +167,132 @@ async def complete_task(
       </div>
     </div>
     """)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Tasks Manager (Backlog & Rules)
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/tasks", response_class=HTMLResponse)
+async def tasks_manager_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Render the full tasks backlog and recurring rules manager."""
+    tasks_stmt = select(Task).order_by(
+        Task.status, Task.priority, Task.due_date.desc().nulls_last(), Task.id.desc()
+    ).limit(100)
+    tasks = list(db.execute(tasks_stmt).scalars().all())
+
+    rules_stmt = select(RecurringRule).order_by(RecurringRule.id.desc())
+    rules = list(db.execute(rules_stmt).scalars().all())
+
+    return templates.TemplateResponse(
+        request,
+        name="tasks_manager.html",
+        context={"tasks": tasks, "rules": rules},
+    )
+
+
+@router.post("/tasks/hx/standard", response_class=HTMLResponse)
+async def create_standard_task_hx(
+    request: Request,
+    title: str = Form(...),
+    description: str = Form(""),
+    priority: str = Form("Medium"),
+    due_date: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to create a standalone task and return its table row."""
+    dt = None
+    if due_date:
+        dt = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+    task = Task(
+        title=title,
+        description=description,
+        priority=TaskPriority(priority),
+        status=TaskStatus.PENDING,
+        due_date=dt,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/task_row.html",
+        context={"task": task},
+    )
+
+
+@router.post("/tasks/hx/recurring", response_class=HTMLResponse)
+async def create_recurring_rule_hx(
+    request: Request,
+    task_title: str = Form(...),
+    rrule_string: str = Form(...),
+    is_strict: str | None = Form(None),
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint to create a recurring rule, spawn its initial task,
+    and return the rule's table row.
+    """
+    now = datetime.now(timezone.utc)
+    rule = RecurringRule(
+        task_title=task_title,
+        rrule_string=rrule_string,
+        is_strict=bool(is_strict),
+    )
+
+    next_due = _compute_next_due(rrule_string, now)
+    if next_due is None:
+        next_due = now
+
+    rule.next_due = next_due
+    db.add(rule)
+    db.flush()
+
+    # Spawn the very first task so the rule is picked up by lazy evaluation later
+    _spawn_next_task(db, rule, next_due)
+
+    db.commit()
+    db.refresh(rule)
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/rule_row.html",
+        context={"rule": rule},
+    )
+
+
+@router.delete("/tasks/hx/{task_id}", response_class=HTMLResponse)
+async def delete_task_hx(
+    task_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to delete a task."""
+    task = db.get(Task, task_id)
+    if task:
+        db.delete(task)
+        db.commit()
+    return HTMLResponse("")
+
+
+@router.delete("/tasks/hx/recurring/{rule_id}", response_class=HTMLResponse)
+async def delete_rule_hx(
+    rule_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint to delete a recurring rule.
+    Cascading will handle linked tasks or they become orphaned depending on DB config.
+    """
+    rule = db.get(RecurringRule, rule_id)
+    if rule:
+        db.delete(rule)
+        db.commit()
+    return HTMLResponse("")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
