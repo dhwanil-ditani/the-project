@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Bookmarks — Personal OS{% endblock %}
+{% block nav_bookmarks %}active{% endblock %}
+
+{% block content %}
+<div class="px-8 py-6 max-w-6xl mx-auto">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-white tracking-tight">Bookmarks</h1>
+    <p class="mt-1 text-sm text-slate-400">
+      {{ bookmarks | length }} saved link{{ 's' if bookmarks | length != 1 else '' }}
+    </p>
+  </div>
+
+  <!-- ── Add Bookmark Form ──────────────────────────────────────────── -->
+  <div class="mb-8">
+    <form
+      hx-post="/web/bookmarks/hx"
+      hx-target="#bookmarks-grid"
+      hx-swap="afterbegin"
+      hx-on::after-request="this.reset()"
+      hx-indicator="#add-spinner"
+      class="flex gap-3"
+    >
+      <div class="flex-1 relative">
+        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+          <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+        </div>
+        <input
+          type="url"
+          name="url"
+          placeholder="Paste a URL to bookmark…"
+          required
+          class="w-full pl-11 pr-4 py-3 bg-surface-800 border border-slate-700/50 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/30 transition-all"
+        />
+      </div>
+
+      <button
+        type="submit"
+        class="px-5 py-3 bg-accent-600 hover:bg-accent-500 text-white text-sm font-medium rounded-xl transition-all duration-200 flex items-center gap-2 shadow-lg shadow-accent-600/20 hover:shadow-accent-500/30"
+      >
+        <!-- Default icon -->
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Save
+      </button>
+
+      <!-- Loading spinner (shown while HTMX request is in-flight) -->
+      <div id="add-spinner" class="htmx-indicator flex items-center">
+        <svg class="w-5 h-5 text-accent-400 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── Bookmarks Grid ─────────────────────────────────────────────── -->
+  {% if bookmarks %}
+  <div id="bookmarks-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for bookmark in bookmarks %}
+      {% include "partials/bookmark_card.html" %}
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div id="bookmarks-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  </div>
+
+  <!-- ── Empty state ────────────────────────────────────────────────── -->
+  <div id="empty-state" class="flex flex-col items-center justify-center py-20 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-surface-800 border border-slate-700/50 flex items-center justify-center mb-4">
+      <svg class="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-slate-300">No bookmarks yet</h3>
+    <p class="mt-1 text-sm text-slate-500">Paste a URL above to save your first bookmark.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+<style>
+  .htmx-indicator { display: none; }
+  .htmx-request .htmx-indicator { display: flex; }
+  .htmx-request button[type="submit"] svg:first-child { display: none; }
+</style>
+{% endblock %}

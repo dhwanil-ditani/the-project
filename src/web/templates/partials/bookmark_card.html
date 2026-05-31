@@ -1,0 +1,76 @@
+<!-- Partial: Single bookmark card -->
+<div id="bookmark-card-{{ bookmark.id }}"
+     class="group bg-surface-800 border border-slate-700/50 rounded-xl overflow-hidden hover:border-slate-600/60 transition-all duration-200">
+
+  <!-- Card body -->
+  <div class="p-5">
+    <!-- Header: favicon + title -->
+    <div class="flex items-start gap-3 mb-3">
+      {% if bookmark.favicon_url %}
+        <img src="{{ bookmark.favicon_url }}"
+             alt=""
+             class="w-5 h-5 rounded mt-0.5 flex-shrink-0"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+        <div class="w-5 h-5 rounded bg-accent-500/20 flex-shrink-0 mt-0.5 items-center justify-center hidden">
+          <svg class="w-3 h-3 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+        </div>
+      {% else %}
+        <div class="w-5 h-5 rounded bg-accent-500/20 flex-shrink-0 mt-0.5 flex items-center justify-center">
+          <svg class="w-3 h-3 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+          </svg>
+        </div>
+      {% endif %}
+
+      <div class="flex-1 min-w-0">
+        <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer"
+           class="text-sm font-medium text-white hover:text-accent-400 transition-colors line-clamp-2 block">
+          {{ bookmark.title or bookmark.url }}
+        </a>
+        <p class="text-[11px] text-slate-500 font-mono truncate mt-0.5">
+          {{ bookmark.url | truncate(50, true, '…') }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Description -->
+    {% if bookmark.description %}
+      <p class="text-xs text-slate-400 line-clamp-2 mb-3 leading-relaxed">
+        {{ bookmark.description }}
+      </p>
+    {% endif %}
+
+    <!-- Tags + actions -->
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex flex-wrap gap-1.5 flex-1 min-w-0">
+        {% for tag in bookmark.tags %}
+          <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-accent-500/10 text-accent-400 border border-accent-500/20">
+            {{ tag.name }}
+          </span>
+        {% endfor %}
+      </div>
+
+      <!-- Delete button -->
+      <button
+        hx-delete="/web/bookmarks/hx/{{ bookmark.id }}"
+        hx-target="#bookmark-card-{{ bookmark.id }}"
+        hx-swap="outerHTML swap:0.2s"
+        hx-confirm="Delete this bookmark?"
+        class="flex-shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-all duration-200"
+        title="Delete bookmark">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Created timestamp -->
+  <div class="px-5 py-2.5 border-t border-slate-700/30 bg-surface-900/30">
+    <p class="text-[10px] text-slate-600 font-medium">
+      {{ bookmark.created_at.strftime('%b %d, %Y') if bookmark.created_at else '' }}
+    </p>
+  </div>
+</div>

@@ -8,15 +8,17 @@ Uses Tailwind CSS + HTMX on the frontend.
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.database import get_db
+from src.models.bookmarks import Bookmark
 from src.models.tasks import Task, TaskPriority, TaskStatus
 from src.schemas.tasks import ActionItem
+from src.services.scraper import scrape_url_metadata
 from src.services.task_engine import evaluate_pending_tasks
 
 router = APIRouter(prefix="/web", tags=["web"])
@@ -40,7 +42,10 @@ async def web_health() -> dict:
     return {"status": "healthy", "layer": "web"}
 
 
-# ── Dashboard ───────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+#  Dashboard
+# ═══════════════════════════════════════════════════════════════════════════
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
@@ -149,3 +154,76 @@ async def complete_task(
       </div>
     </div>
     """)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Bookmarks
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/bookmarks", response_class=HTMLResponse)
+async def bookmarks_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Render the bookmarks page with all saved bookmarks."""
+    stmt = select(Bookmark).order_by(Bookmark.id.desc())
+    bookmarks = list(db.execute(stmt).scalars().all())
+
+    return templates.TemplateResponse(
+        request,
+        name="bookmarks.html",
+        context={"bookmarks": bookmarks},
+    )
+
+
+@router.post("/bookmarks/hx", response_class=HTMLResponse)
+async def create_bookmark_hx(
+    request: Request,
+    url: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint — create a bookmark from a URL and return the
+    rendered card partial for injection into the grid.
+
+    Auto-scrapes title, description, and favicon when missing.
+    """
+    # Auto-scrape metadata
+    metadata = await scrape_url_metadata(url)
+
+    bookmark = Bookmark(
+        url=url,
+        title=metadata.title,
+        description=metadata.description,
+        favicon_url=metadata.favicon_url,
+    )
+    db.add(bookmark)
+    db.commit()
+    db.refresh(bookmark)
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/bookmark_card.html",
+        context={"bookmark": bookmark},
+    )
+
+
+@router.delete("/bookmarks/hx/{bookmark_id}", response_class=HTMLResponse)
+async def delete_bookmark_hx(
+    bookmark_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint — delete a bookmark and return empty response
+    so HTMX removes the element from the DOM.
+    """
+    bookmark = db.get(Bookmark, bookmark_id)
+    if bookmark is None:
+        return HTMLResponse("", status_code=404)
+
+    db.delete(bookmark)
+    db.commit()
+
+    # Return empty string — HTMX outerHTML swap removes the card
+    return HTMLResponse("")
+
