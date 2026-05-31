@@ -5,9 +5,12 @@ All routes under ``/web`` are registered here.
 Uses Tailwind CSS + HTMX on the frontend.
 """
 
+import json
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
+from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -16,8 +19,10 @@ from sqlalchemy.orm import Session
 
 from src.database import get_db
 from src.models.bookmarks import Bookmark
+from src.models.expenses import Account, AccountType, Transaction
 from src.models.tasks import Task, TaskPriority, TaskStatus
 from src.schemas.tasks import ActionItem
+from src.services.ledger import process_transaction
 from src.services.scraper import scrape_url_metadata
 from src.services.task_engine import evaluate_pending_tasks
 
@@ -226,4 +231,163 @@ async def delete_bookmark_hx(
 
     # Return empty string — HTMX outerHTML swap removes the card
     return HTMLResponse("")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Expenses
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _compute_monthly_spending_web(
+    db: Session, month_start: datetime, month_end: datetime
+) -> tuple[Decimal, dict[str, Decimal]]:
+    """
+    Compute total spending and category breakdown for a date range.
+
+    Same logic as the API: spending = outflows from non-System accounts
+    where to_account_id IS NULL (pure expenses only).
+    """
+    stmt = select(Transaction).where(
+        Transaction.date >= month_start,
+        Transaction.date < month_end,
+        Transaction.to_account_id.is_(None),
+    )
+    transactions = list(db.execute(stmt).scalars().all())
+
+    total = Decimal("0.00")
+    breakdown: dict[str, Decimal] = {}
+
+    for txn in transactions:
+        from_acct = db.get(Account, txn.from_account_id)
+        if from_acct is not None and from_acct.type == AccountType.SYSTEM:
+            continue
+
+        amount = Decimal(str(txn.amount))
+        total += amount
+        breakdown[txn.category] = breakdown.get(txn.category, Decimal("0.00")) + amount
+
+    return total, breakdown
+
+
+@router.get("/expenses", response_class=HTMLResponse)
+async def expenses_page(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """
+    Render the expenses dashboard page.
+
+    Computes financial metrics, fetches accounts (for form dropdowns),
+    and recent transactions.
+    """
+    now = datetime.now(timezone.utc)
+
+    # ── Compute metrics ──────────────────────────────────────────────
+    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    next_month_start = current_month_start + relativedelta(months=1)
+    prev_month_start = current_month_start - relativedelta(months=1)
+
+    monthly_spending, category_breakdown = _compute_monthly_spending_web(
+        db, current_month_start, next_month_start
+    )
+    prev_spending, _ = _compute_monthly_spending_web(
+        db, prev_month_start, current_month_start
+    )
+
+    if prev_spending == Decimal("0.00"):
+        mom_pct = 0.0 if monthly_spending == Decimal("0.00") else 100.0
+    else:
+        mom_pct = float(
+            ((monthly_spending - prev_spending) / prev_spending) * 100
+        )
+
+    accounts_stmt = select(Account).where(
+        Account.type.in_([AccountType.BANK, AccountType.CASH])
+    )
+    net_worth_accounts = list(db.execute(accounts_stmt).scalars().all())
+    net_worth = sum(
+        (Decimal(str(a.current_balance)) for a in net_worth_accounts),
+        Decimal("0.00"),
+    )
+
+    metrics = {
+        "net_worth": net_worth,
+        "monthly_spending": monthly_spending,
+        "mom_spending_change_pct": round(mom_pct, 2),
+        "category_breakdown": category_breakdown,
+    }
+
+    # Serialize breakdown for Chart.js (Decimal → float)
+    breakdown_json = json.dumps(
+        {k: float(v) for k, v in category_breakdown.items()}
+    )
+
+    # ── Fetch accounts (all types, for form dropdowns) ───────────────
+    all_accounts = list(
+        db.execute(select(Account).order_by(Account.id)).scalars().all()
+    )
+
+    # ── Fetch recent transactions ────────────────────────────────────
+    txn_stmt = select(Transaction).order_by(Transaction.id.desc()).limit(50)
+    recent_txns = list(db.execute(txn_stmt).scalars().all())
+
+    return templates.TemplateResponse(
+        request,
+        name="expenses.html",
+        context={
+            "metrics": metrics,
+            "category_breakdown_json": breakdown_json,
+            "accounts": all_accounts,
+            "transactions": recent_txns,
+        },
+    )
+
+
+@router.post("/expenses/hx/transaction", response_class=HTMLResponse)
+async def create_transaction_hx(
+    request: Request,
+    amount: str = Form(...),
+    category: str = Form(...),
+    description: str = Form(...),
+    from_account_id: int = Form(...),
+    date: str = Form(""),
+    to_account_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """
+    HTMX endpoint — create a transaction and return the rendered
+    table row partial for injection into the ledger.
+    """
+    # Parse date
+    txn_date = datetime.now(timezone.utc)
+    if date:
+        txn_date = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+
+    # Parse optional to_account_id
+    to_acct_id: int | None = None
+    if to_account_id and to_account_id.strip():
+        to_acct_id = int(to_account_id)
+
+    txn = Transaction(
+        amount=Decimal(amount),
+        date=txn_date,
+        description=description,
+        category=category,
+        from_account_id=from_account_id,
+        to_account_id=to_acct_id,
+    )
+    db.add(txn)
+    db.flush()
+    db.refresh(txn)
+
+    # Apply balance changes
+    process_transaction(db, txn)
+
+    db.commit()
+    db.refresh(txn)
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/transaction_row.html",
+        context={"txn": txn},
+    )
 

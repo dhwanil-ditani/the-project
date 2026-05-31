@@ -1,0 +1,45 @@
+<!-- Partial: Single transaction table row -->
+<tr id="txn-row-{{ txn.id }}" class="border-b border-slate-700/30 hover:bg-surface-700/30 transition-colors">
+  <!-- Date -->
+  <td class="px-4 py-3 text-xs text-slate-400 font-mono whitespace-nowrap">
+    {{ txn.date.strftime('%b %d, %Y') if txn.date else '—' }}
+  </td>
+
+  <!-- Description -->
+  <td class="px-4 py-3">
+    <p class="text-sm text-white truncate max-w-[200px]">{{ txn.description }}</p>
+  </td>
+
+  <!-- Category -->
+  <td class="px-4 py-3">
+    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-accent-500/10 text-accent-400 border border-accent-500/20">
+      {{ txn.category }}
+    </span>
+  </td>
+
+  <!-- From Account -->
+  <td class="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
+    {{ txn.from_account.name if txn.from_account else '—' }}
+  </td>
+
+  <!-- Amount -->
+  <td class="px-4 py-3 text-right whitespace-nowrap">
+    {% if txn.to_account_id is not none %}
+      {# Transfer — neutral/green styling #}
+      <span class="text-sm font-mono font-medium text-slate-400">
+        {{ "%.2f" | format(txn.amount | float) }}
+      </span>
+      <span class="ml-1 text-[9px] text-slate-600 uppercase">xfer</span>
+    {% elif txn.from_account and txn.from_account.type.value == 'System' %}
+      {# Income — green styling #}
+      <span class="text-sm font-mono font-medium text-emerald-400">
+        +{{ "%.2f" | format(txn.amount | float) }}
+      </span>
+    {% else %}
+      {# Expense — red styling #}
+      <span class="text-sm font-mono font-medium text-rose-400">
+        −{{ "%.2f" | format(txn.amount | float) }}
+      </span>
+    {% endif %}
+  </td>
+</tr>
