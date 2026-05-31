@@ -1,5 +1,13 @@
 <tr class="border-b border-slate-700/30 hover:bg-surface-700/30 transition-colors" id="task-row-{{ task.id }}">
-  <td class="px-4 py-3 whitespace-nowrap text-sm text-white font-medium">{{ task.title }}</td>
+  <td class="px-4 py-3 whitespace-nowrap text-sm text-white font-medium flex items-center gap-2">
+    <span>{{ task.title }}</span>
+    {% if task.note_id and notes_map and task.note_id in notes_map %}
+      <a href="/web/notes/by-title/{{ notes_map[task.note_id] }}"
+         class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-700/50 text-slate-400 hover:text-accent-400 hover:bg-surface-700 transition-colors border border-slate-700">
+        📝 [[{{ notes_map[task.note_id] }}]]
+      </a>
+    {% endif %}
+  </td>
   <td class="px-4 py-3 whitespace-nowrap">
     <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
       {% if task.priority.value == 'High' %}bg-rose-500/20 text-rose-400
@@ -20,7 +28,13 @@
   <td class="px-4 py-3 whitespace-nowrap text-sm text-slate-400">
     {{ task.due_date.strftime('%b %d, %Y') if task.due_date else 'No date' }}
   </td>
-  <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+  <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-x-3">
+    <button hx-get="/web/tasks/hx/{{ task.id }}/edit"
+            hx-target="#task-row-{{ task.id }}"
+            hx-swap="outerHTML"
+            class="text-accent-400 hover:text-accent-300 transition-colors">
+      Edit
+    </button>
     <button hx-delete="/web/tasks/hx/{{ task.id }}"
             hx-target="#task-row-{{ task.id }}"
             hx-swap="outerHTML"

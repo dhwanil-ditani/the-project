@@ -122,12 +122,20 @@ async def dashboard(
 
     today_date = now.strftime("%A, %B %d, %Y")
 
+    # For cross-module linking: notes dictionary mapping Note ID -> Title
+    notes_stmt = select(Note)
+    all_notes = list(db.execute(notes_stmt).scalars().all())
+    notes_map = {n.id: n.title for n in all_notes}
+    task_notes = {t.id: t.note_id for t in tasks if t.note_id is not None}
+
     return templates.TemplateResponse(
         request,
         name="dashboard.html",
         context={
             "action_items": action_items,
             "today_date": today_date,
+            "notes_map": notes_map,
+            "task_notes": task_notes,
         },
     )
 
@@ -187,10 +195,14 @@ async def tasks_manager_page(
     rules_stmt = select(RecurringRule).order_by(RecurringRule.id.desc())
     rules = list(db.execute(rules_stmt).scalars().all())
 
+    notes_stmt = select(Note).order_by(Note.title)
+    all_notes = list(db.execute(notes_stmt).scalars().all())
+    notes_map = {n.id: n.title for n in all_notes}
+
     return templates.TemplateResponse(
         request,
         name="tasks_manager.html",
-        context={"tasks": tasks, "rules": rules},
+        context={"tasks": tasks, "rules": rules, "notes": all_notes, "notes_map": notes_map},
     )
 
 
@@ -201,6 +213,7 @@ async def create_standard_task_hx(
     description: str = Form(""),
     priority: str = Form("Medium"),
     due_date: str = Form(""),
+    note_id: str = Form(""),
     db: Session = Depends(get_db),
 ):
     """HTMX endpoint to create a standalone task and return its table row."""
@@ -208,21 +221,28 @@ async def create_standard_task_hx(
     if due_date:
         dt = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
 
+    parsed_note_id = int(note_id) if note_id and note_id.strip() else None
+
     task = Task(
         title=title,
         description=description,
         priority=TaskPriority(priority),
         status=TaskStatus.PENDING,
         due_date=dt,
+        note_id=parsed_note_id,
     )
     db.add(task)
     db.commit()
     db.refresh(task)
 
+    notes_stmt = select(Note)
+    all_notes = list(db.execute(notes_stmt).scalars().all())
+    notes_map = {n.id: n.title for n in all_notes}
+
     return templates.TemplateResponse(
         request,
         name="partials/task_row.html",
-        context={"task": task},
+        context={"task": task, "notes_map": notes_map},
     )
 
 
@@ -263,6 +283,81 @@ async def create_recurring_rule_hx(
         request,
         name="partials/rule_row.html",
         context={"rule": rule},
+    )
+
+
+@router.get("/tasks/hx/{task_id}", response_class=HTMLResponse)
+async def get_task_hx(
+    task_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to return the static task row (used to cancel edit)."""
+    task = db.get(Task, task_id)
+    
+    notes_stmt = select(Note)
+    all_notes = list(db.execute(notes_stmt).scalars().all())
+    notes_map = {n.id: n.title for n in all_notes}
+
+    return templates.TemplateResponse(
+        "partials/task_row.html",
+        context={"request": {}, "task": task, "notes_map": notes_map},
+    )
+
+
+@router.get("/tasks/hx/{task_id}/edit", response_class=HTMLResponse)
+async def edit_task_form_hx(
+    request: Request,
+    task_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to return the inline edit form for a task."""
+    task = db.get(Task, task_id)
+
+    notes_stmt = select(Note).order_by(Note.title)
+    all_notes = list(db.execute(notes_stmt).scalars().all())
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/task_edit_row.html",
+        context={"task": task, "notes": all_notes},
+    )
+
+
+@router.post("/tasks/hx/{task_id}/edit", response_class=HTMLResponse)
+async def update_task_hx(
+    request: Request,
+    task_id: int,
+    title: str = Form(...),
+    priority: str = Form("Medium"),
+    due_date: str = Form(""),
+    note_id: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to update a task inline and return the static row."""
+    task = db.get(Task, task_id)
+    
+    dt = None
+    if due_date:
+        dt = datetime.strptime(due_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    
+    parsed_note_id = int(note_id) if note_id and note_id.strip() else None
+
+    task.title = title
+    task.priority = TaskPriority(priority)
+    task.due_date = dt
+    task.note_id = parsed_note_id
+
+    db.commit()
+    db.refresh(task)
+
+    notes_stmt = select(Note)
+    all_notes = list(db.execute(notes_stmt).scalars().all())
+    notes_map = {n.id: n.title for n in all_notes}
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/task_row.html",
+        context={"task": task, "notes_map": notes_map},
     )
 
 
@@ -337,6 +432,57 @@ async def create_bookmark_hx(
         favicon_url=metadata.favicon_url,
     )
     db.add(bookmark)
+    db.commit()
+    db.refresh(bookmark)
+
+    return templates.TemplateResponse(
+        request,
+        name="partials/bookmark_card.html",
+        context={"bookmark": bookmark},
+    )
+
+
+@router.get("/bookmarks/hx/{bookmark_id}", response_class=HTMLResponse)
+async def get_bookmark_hx(
+    bookmark_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to return the static bookmark card (used to cancel edit)."""
+    bookmark = db.get(Bookmark, bookmark_id)
+    return templates.TemplateResponse(
+        "partials/bookmark_card.html",
+        context={"request": {}, "bookmark": bookmark},
+    )
+
+
+@router.get("/bookmarks/hx/{bookmark_id}/edit", response_class=HTMLResponse)
+async def edit_bookmark_form_hx(
+    request: Request,
+    bookmark_id: int,
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to return the inline edit form for a bookmark."""
+    bookmark = db.get(Bookmark, bookmark_id)
+    return templates.TemplateResponse(
+        request,
+        name="partials/bookmark_edit_card.html",
+        context={"bookmark": bookmark},
+    )
+
+
+@router.post("/bookmarks/hx/{bookmark_id}/edit", response_class=HTMLResponse)
+async def update_bookmark_hx(
+    request: Request,
+    bookmark_id: int,
+    title: str = Form(...),
+    description: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    """HTMX endpoint to update a bookmark inline and return the static card."""
+    bookmark = db.get(Bookmark, bookmark_id)
+    bookmark.title = title
+    bookmark.description = description
+    
     db.commit()
     db.refresh(bookmark)
 

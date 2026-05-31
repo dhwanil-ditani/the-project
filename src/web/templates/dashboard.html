@@ -69,6 +69,16 @@
         <div class="flex items-center gap-2.5">
           <h3 class="text-sm font-medium text-white truncate">{{ item.title }}</h3>
 
+          <!-- Linked Note -->
+          {% if task_notes and item.id in task_notes and notes_map and task_notes[item.id] in notes_map %}
+            {% set nid = task_notes[item.id] %}
+            {% set ntitle = notes_map[nid] %}
+            <a href="/web/notes/by-title/{{ ntitle }}"
+               class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium bg-surface-700/50 text-slate-400 hover:text-accent-400 hover:bg-surface-700 transition-colors border border-slate-700">
+              📝 [[{{ ntitle }}]]
+            </a>
+          {% endif %}
+
           <!-- Priority badge -->
           {% if item.priority == 'High' %}
             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider bg-rose-500/15 text-rose-400 border border-rose-500/20">
