@@ -66,8 +66,12 @@ async def scrape_url_metadata(url: str) -> ScrapedMetadata:
     # ── Meta description ────────────────────────────────────────────────
     try:
         meta_desc = soup.find("meta", attrs={"name": "description"})
-        if meta_desc and meta_desc.get("content"):
-            result.description = meta_desc["content"].strip()
+        if meta_desc:
+            content = meta_desc.get("content")
+            if isinstance(content, list):
+                content = content[0] if content else ""
+            if content:
+                result.description = str(content).strip()
     except Exception:
         pass
 
@@ -76,8 +80,14 @@ async def scrape_url_metadata(url: str) -> ScrapedMetadata:
         icon_link = soup.find(
             "link", rel=lambda r: r and "icon" in (r if isinstance(r, list) else [r])
         )
-        if icon_link and icon_link.get("href"):
-            result.favicon_url = urljoin(str(url), icon_link["href"])
+        if icon_link:
+            href = icon_link.get("href")
+            if isinstance(href, list):
+                href = href[0] if href else ""
+            if href:
+                result.favicon_url = urljoin(str(url), str(href))
+            else:
+                result.favicon_url = urljoin(str(url), "/favicon.ico")
         else:
             # Fallback: try /favicon.ico at the domain root
             result.favicon_url = urljoin(str(url), "/favicon.ico")
