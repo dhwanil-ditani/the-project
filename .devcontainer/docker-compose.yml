@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    # Overrides default command so things don't shut down after the process ends.
+    command: sleep infinity
+    environment:
+      # Connect to the dev postgres instance
+      - DATABASE_URL=postgresql+psycopg2://os_admin:your_secure_password@db:5432/personal_os
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: os_admin
+      POSTGRES_PASSWORD: your_secure_password
+      POSTGRES_DB: personal_os
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
