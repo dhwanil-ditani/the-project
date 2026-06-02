@@ -19,6 +19,10 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# ── Mount static files ──────────────────────────────────────────────────────
+from fastapi.staticfiles import StaticFiles
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
+
 # ── Mount routers ───────────────────────────────────────────────────────────
 app.include_router(api_v1_router)
 app.include_router(web_router)

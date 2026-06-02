@@ -12,8 +12,12 @@ from decimal import Decimal
 from pathlib import Path
 
 import markdown
+import uuid
+import shutil
+import os
 from dateutil.relativedelta import relativedelta
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
+from fastapi.responses import HTMLResponse
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -551,18 +555,30 @@ def _compute_monthly_spending_web(
 @router.get("/expenses", response_class=HTMLResponse)
 async def expenses_page(
     request: Request,
+    month: str | None = None,
     db: Session = Depends(get_db),
 ):
     """
     Render the expenses dashboard page.
 
     Computes financial metrics, fetches accounts (for form dropdowns),
-    and recent transactions.
+    and recent transactions within the bounded month.
     """
     now = datetime.now(timezone.utc)
 
+    # ── Parse or default target month ────────────────────────────────
+    if month:
+        try:
+            target_date = datetime.strptime(month, "%Y-%m").replace(tzinfo=timezone.utc)
+            current_month_start = target_date
+        except ValueError:
+            current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    selected_month = current_month_start.strftime("%Y-%m")
+
     # ── Compute metrics ──────────────────────────────────────────────
-    current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     next_month_start = current_month_start + relativedelta(months=1)
     prev_month_start = current_month_start - relativedelta(months=1)
 
@@ -606,8 +622,11 @@ async def expenses_page(
         db.execute(select(Account).order_by(Account.id)).scalars().all()
     )
 
-    # ── Fetch recent transactions ────────────────────────────────────
-    txn_stmt = select(Transaction).order_by(Transaction.id.desc()).limit(50)
+    # ── Fetch recent transactions strictly within target month ───────
+    txn_stmt = select(Transaction).where(
+        Transaction.date >= current_month_start,
+        Transaction.date < next_month_start
+    ).order_by(Transaction.id.desc()).limit(50)
     recent_txns = list(db.execute(txn_stmt).scalars().all())
 
     return templates.TemplateResponse(
@@ -618,6 +637,7 @@ async def expenses_page(
             "category_breakdown_json": breakdown_json,
             "accounts": all_accounts,
             "transactions": recent_txns,
+            "selected_month": selected_month,
         },
     )
 
@@ -813,6 +833,35 @@ async def save_note_hx(
     db.commit()
 
     return HTMLResponse(
-        '<span class="text-emerald-400 font-medium">'
-        '✓ Saved</span>'
+        f'<span class="text-emerald-400">✓ Saved at {datetime.now().strftime("%H:%M:%S")}</span>'
+    )
+
+
+@router.post("/notes/hx/upload", response_class=HTMLResponse)
+async def upload_asset_hx(
+    file: UploadFile = File(...),
+):
+    """
+    HTMX endpoint — process local file uploads for the PKB editor.
+    Returns the markdown snippet for the image.
+    """
+    if not file.filename:
+        return HTMLResponse('<span class="text-rose-400">No file provided</span>', status_code=400)
+        
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']:
+        return HTMLResponse('<span class="text-rose-400">Invalid file type</span>', status_code=400)
+        
+    safe_filename = f"{uuid.uuid4().hex}{ext}"
+    upload_dir = Path("src/static/uploads")
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    
+    file_path = upload_dir / safe_filename
+    with file_path.open("wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    markdown_snippet = f"![{file.filename}](/static/uploads/{safe_filename})"
+    
+    return HTMLResponse(
+        f'<span class="text-emerald-400">Uploaded:</span> <code class="bg-surface-900 px-1 py-0.5 rounded ml-1 text-slate-300">{markdown_snippet}</code>'
     )
