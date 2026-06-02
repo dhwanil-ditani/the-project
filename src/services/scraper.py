@@ -71,7 +71,7 @@ async def scrape_url_metadata(url: str) -> ScrapedMetadata:
             if isinstance(content, list):
                 content = content[0] if content else ""
             if content:
-                result.description = str(content).strip()
+                result.description = content.strip()
     except Exception:
         pass
 
@@ -85,7 +85,7 @@ async def scrape_url_metadata(url: str) -> ScrapedMetadata:
             if isinstance(href, list):
                 href = href[0] if href else ""
             if href:
-                result.favicon_url = urljoin(str(url), str(href))
+                result.favicon_url = urljoin(str(url), href)
             else:
                 result.favicon_url = urljoin(str(url), "/favicon.ico")
         else:
