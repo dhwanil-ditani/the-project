@@ -292,19 +292,23 @@ async def create_recurring_rule_hx(
 
 @router.get("/tasks/hx/{task_id}", response_class=HTMLResponse)
 async def get_task_hx(
+    request: Request,
     task_id: int,
     db: Session = Depends(get_db),
 ):
     """HTMX endpoint to return the static task row (used to cancel edit)."""
     task = db.get(Task, task_id)
+    if not task:
+        return HTMLResponse("<tr><td colspan='6' class='text-rose-400'>Task not found</td></tr>", status_code=404)
     
     notes_stmt = select(Note)
     all_notes = list(db.execute(notes_stmt).scalars().all())
     notes_map = {n.id: n.title for n in all_notes}
 
     return templates.TemplateResponse(
-        "partials/task_row.html",
-        context={"request": {}, "task": task, "notes_map": notes_map},
+        request,
+        name="partials/task_row.html",
+        context={"task": task, "notes_map": notes_map},
     )
 
 
@@ -339,6 +343,8 @@ async def update_task_hx(
 ):
     """HTMX endpoint to update a task inline and return the static row."""
     task = db.get(Task, task_id)
+    if not task:
+        return HTMLResponse("<tr><td colspan='6' class='text-rose-400'>Task not found</td></tr>", status_code=404)
     
     dt = None
     if due_date:
@@ -448,14 +454,18 @@ async def create_bookmark_hx(
 
 @router.get("/bookmarks/hx/{bookmark_id}", response_class=HTMLResponse)
 async def get_bookmark_hx(
+    request: Request,
     bookmark_id: int,
     db: Session = Depends(get_db),
 ):
     """HTMX endpoint to return the static bookmark card (used to cancel edit)."""
     bookmark = db.get(Bookmark, bookmark_id)
+    if not bookmark:
+        return HTMLResponse("<div class='text-rose-400'>Bookmark not found</div>", status_code=404)
     return templates.TemplateResponse(
-        "partials/bookmark_card.html",
-        context={"request": {}, "bookmark": bookmark},
+        request,
+        name="partials/bookmark_card.html",
+        context={"bookmark": bookmark},
     )
 
 
@@ -484,6 +494,8 @@ async def update_bookmark_hx(
 ):
     """HTMX endpoint to update a bookmark inline and return the static card."""
     bookmark = db.get(Bookmark, bookmark_id)
+    if not bookmark:
+        return HTMLResponse("<div class='text-rose-400'>Bookmark not found</div>", status_code=404)
     bookmark.title = title
     bookmark.description = description
     
