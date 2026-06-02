@@ -45,7 +45,7 @@ async def scrape_url_metadata(url: str) -> ScrapedMetadata:
                 )
             },
         ) as client:
-            response = await client.get(str(url))
+            response = await client.get(url)
             response.raise_for_status()
     except Exception:
         return result
@@ -85,12 +85,12 @@ async def scrape_url_metadata(url: str) -> ScrapedMetadata:
             if isinstance(href, list):
                 href = href[0] if href else ""
             if href:
-                result.favicon_url = urljoin(str(url), href)
+                result.favicon_url = urljoin(url, href)
             else:
-                result.favicon_url = urljoin(str(url), "/favicon.ico")
+                result.favicon_url = urljoin(url, "/favicon.ico")
         else:
             # Fallback: try /favicon.ico at the domain root
-            result.favicon_url = urljoin(str(url), "/favicon.ico")
+            result.favicon_url = urljoin(url, "/favicon.ico")
     except Exception:
         pass
 
