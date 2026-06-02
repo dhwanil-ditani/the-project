@@ -29,6 +29,8 @@ dev = [
 extraPaths = ["."]
 venvPath = "."
 venv = ".venv"
+ignore = ["**/__pyrefly_virtual__/**", "/__pyrefly_virtual__", "__pyrefly_virtual__"]
+exclude = ["**/__pyrefly_virtual__/**", "/__pyrefly_virtual__", "__pyrefly_virtual__"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
