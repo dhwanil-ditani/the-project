@@ -6,6 +6,7 @@ session, ensuring tests never touch the production database.
 """
 
 import pytest
+from collections.abc import Generator
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -42,7 +43,7 @@ def setup_test_db():
 
 
 @pytest.fixture()
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     """Provide a synchronous test client backed by the in-memory DB."""
     app.dependency_overrides[get_db] = _override_get_db
     with TestClient(app) as c:
