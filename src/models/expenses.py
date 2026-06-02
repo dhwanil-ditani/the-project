@@ -7,6 +7,7 @@ The system bootstraps with an "Initial Equity" account of type System.
 """
 
 import enum
+from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, Numeric, String
@@ -36,8 +37,8 @@ class Account(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     type: Mapped[AccountType] = mapped_column(Enum(AccountType), nullable=False)
-    current_balance: Mapped[float] = mapped_column(
-        Numeric(precision=12, scale=2), nullable=False, default=0.00
+    current_balance: Mapped[Decimal] = mapped_column(
+        Numeric(precision=12, scale=2), nullable=False, default=Decimal("0.00")
     )
 
     # Relationships — outbound and inbound transactions
@@ -70,7 +71,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    amount: Mapped[float] = mapped_column(
+    amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=12, scale=2), nullable=False
     )
     date: Mapped[datetime] = mapped_column(
