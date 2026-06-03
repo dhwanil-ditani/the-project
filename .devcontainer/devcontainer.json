@@ -10,7 +10,8 @@
         "ms-python.vscode-pylance",
         "charliermarsh.ruff",
         "tamasfe.even-better-toml",
-        "bradlc.vscode-tailwindcss"
+        "bradlc.vscode-tailwindcss",
+        "vscode-icons-team.vscode-icons"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/workspace/.venv/bin/python"

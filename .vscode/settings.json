@@ -1,3 +1,4 @@
 {
-    "chat.disableAIFeatures": true
+    "chat.disableAIFeatures": true,
+    "workbench.iconTheme": "vscode-icons"
 }
