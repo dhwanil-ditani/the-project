@@ -24,7 +24,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg2://os_admin:your_secure_password@db:5432/personal_os}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://os_admin:your_secure_password@db:5432/personal_os}
     volumes:
       # Map local ./uploads to container's static uploads directory for PKB image persistence
       - ./uploads:/app/src/static/uploads

@@ -11,7 +11,7 @@ services:
     command: sleep infinity
     environment:
       # Connect to the dev postgres instance
-      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/postgres
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/postgres
     depends_on:
       db:
         condition: service_healthy
