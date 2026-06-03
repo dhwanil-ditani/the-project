@@ -844,9 +844,22 @@ async def save_note_hx(
 
     db.commit()
 
-    return HTMLResponse(
-        f'<span class="text-emerald-400">✓ Saved at {datetime.now().strftime("%H:%M:%S")}</span>'
+    # Generate the updated markdown preview
+    rendered_html = _render_markdown(note.content) if note.content else ""
+    preview_html = templates.get_template("partials/note_preview.html").render(
+        {"rendered_html": rendered_html}
     )
+    
+    # Inject OOB attribute so HTMX hot-swaps the preview panel
+    preview_html = preview_html.replace(
+        'id="note-preview-content"', 
+        'id="note-preview-content" hx-swap-oob="outerHTML"'
+    )
+
+    feedback_html = f'<span class="text-emerald-400">✓ Saved at {datetime.now().strftime("%H:%M:%S")}</span>'
+
+    # Return both the feedback (normal swap) and the updated preview (OOB swap)
+    return HTMLResponse(feedback_html + preview_html)
 
 
 @router.post("/notes/hx/upload", response_class=HTMLResponse)
